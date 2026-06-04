@@ -4,14 +4,11 @@
 // Implementación guiada por eventos + alarma de respaldo (24/7 seguro y preciso).
 // ─────────────────────────────────────────────
 
-const IDLE_THRESHOLD_SECONDS = 60; // 1 minuto de inactividad
-
 // ── Estado en memoria ──
 let activeTabId = null;
 let activeDomain = null;
 let activeVideoInfo = null;
 let lastSessionStartTime = null;
-let isUserIdle = false;
 
 // TabId -> { videoId, title, channel } para rastrear pestañas de YouTube independientes
 let youtubeTabs = {};
@@ -98,9 +95,9 @@ async function updateActiveSession(newDomain, newVideoInfo) {
   activeDomain = newDomain;
   activeVideoInfo = newVideoInfo;
 
-  // IMPORTANTE: Ya no dependemos de isBrowserFocused.
-  // Siempre rastreamos si hay un dominio y el usuario no está inactivo.
-  const isTrackingActive = activeDomain && !isUserIdle;
+  // IMPORTANTE: Ya no dependemos de isBrowserFocused ni de inactividad (idle).
+  // Siempre rastreamos si hay un dominio, ideal para que cuente al ver videos.
+  const isTrackingActive = !!activeDomain;
 
   if (isTrackingActive) {
     lastSessionStartTime = now;
@@ -158,22 +155,8 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
 // con la solicitud del usuario de "contar el tiempo todo el rato", incluso
 // cuando Chrome no tenga el foco.
 
-// Cambio de estado de inactividad del usuario (teclado/ratón)
-chrome.idle.setDetectionInterval(IDLE_THRESHOLD_SECONDS);
-chrome.idle.onStateChanged.addListener(async (state) => {
-  isUserIdle = (state !== 'active');
-  if (isUserIdle) {
-    await updateActiveSession(null, null);
-  } else {
-    const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-    if (tab) {
-      activeTabId = tab.id;
-      const domain = extractDomain(tab.url);
-      const videoInfo = youtubeTabs[tab.id] || null;
-      await updateActiveSession(domain, videoInfo);
-    }
-  }
-});
+// (Eliminado el listener de inactividad chrome.idle para que no se pause el contador
+// cuando el usuario ve videos largos sin mover el ratón)
 
 // Mensajes del script de contenido (YouTube)
 chrome.runtime.onMessage.addListener(async (message, sender) => {
@@ -217,7 +200,6 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
 // ── INICIALIZACIÓN AL INICIAR/DESPERTAR SW ──
 async function initActiveTab() {
-  isUserIdle = false;
 
   const windows = await chrome.windows.getAll({ populate: true }).catch(() => []);
   // Buscamos una ventana normal que esté enfocada, o en su defecto la primera ventana normal
