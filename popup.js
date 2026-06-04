@@ -48,8 +48,8 @@ const DEFAULT_ICON = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000
 
 // Palette de colores para el gráfico de tarta
 const CHART_COLORS = [
-  '#6c63ff', '#3ecf8e', '#f59e0b', '#ef4444',
-  '#06b6d4', '#a855f7', '#ec4899', '#84cc16',
+  '#3b82f6', '#facc15', '#3ecf8e', '#60a5fa',
+  '#06b6d4', '#eab308', '#ec4899', '#84cc16',
 ];
 
 // Helper para obtener el valor del almacenamiento local
