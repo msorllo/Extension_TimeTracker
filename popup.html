@@ -103,7 +103,12 @@
 
   <!-- ── FOOTER ── -->
   <footer class="app-footer">
-    <button id="btn-clear" class="btn-danger-subtle" title="Borrar todos los datos">🗑 Borrar datos</button>
+    <div class="footer-actions">
+      <button id="btn-clear" class="btn-icon" title="Borrar todos los datos">🗑️</button>
+      <button id="btn-export-db" class="btn-icon" title="Exportar copia de seguridad">📥</button>
+      <button id="btn-import-db" class="btn-icon" title="Importar copia de seguridad">📤</button>
+      <input type="file" id="input-import-db" accept=".json" style="display: none;" />
+    </div>
     <span class="footer-note">Se pausa cuando estás inactivo</span>
   </footer>
 

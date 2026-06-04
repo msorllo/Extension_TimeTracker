@@ -12,6 +12,9 @@ const domElements = {
   btnSummary:        document.getElementById('btn-summary'),
   btnBack:           document.getElementById('btn-back'),
   btnClear:          document.getElementById('btn-clear'),
+  btnExport:         document.getElementById('btn-export-db'),
+  btnImport:         document.getElementById('btn-import-db'),
+  inputImport:       document.getElementById('input-import-db'),
   summaryDate:       document.getElementById('summary-date'),
   summaryContent:    document.getElementById('summary-content'),
   tabBtns:           document.querySelectorAll('.tab-btn'),
@@ -718,6 +721,49 @@ domElements.btnClear.addEventListener('click', async () => {
   if (!confirmed) return;
   await clearAllData();
   switchToView(currentPeriod);
+});
+
+// Lógica de Exportación de BD
+domElements.btnExport.addEventListener('click', () => {
+  chrome.storage.local.get(null, (data) => {
+    const jsonStr = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `timetracker_backup_${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+});
+
+// Lógica de Importación de BD
+domElements.btnImport.addEventListener('click', () => {
+  domElements.inputImport.click();
+});
+
+domElements.inputImport.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    try {
+      const data = JSON.parse(evt.target.result);
+      if (confirm('¿Quieres sobrescribir tu base de datos actual con esta copia de seguridad?')) {
+        chrome.storage.local.clear(() => {
+          chrome.storage.local.set(data, () => {
+            alert('¡Base de datos importada correctamente! La extensión se actualizará.');
+            switchToView(currentPeriod);
+          });
+        });
+      }
+    } catch (err) {
+      alert('Error al leer el archivo. Asegúrate de que es un JSON válido.');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = ''; // Limpiar el input
 });
 
 // Escuchar actualizaciones de estado desde background

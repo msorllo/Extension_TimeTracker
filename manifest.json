@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
   "name": "TimeTracker Pro",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Registra cuánto tiempo pasas en cada sitio web: por día, semana y mes. Con gráficos y resúmenes.",
   "permissions": [
     "tabs",
     "storage",
+    "unlimitedStorage",
     "idle",
     "alarms",
     "favicon"
