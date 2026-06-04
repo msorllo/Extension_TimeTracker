@@ -83,11 +83,23 @@ async function addTimeToStorage(domain, seconds, videoInfo) {
 async function updateActiveSession(newDomain, newVideoInfo) {
   const now = Date.now();
 
+  // Restaurar desde storage si el Service Worker se suspendió y perdimos la memoria
+  if (!activeDomain && !lastSessionStartTime) {
+    const session = await getStorageValue('activeSession');
+    if (session && session.domain && session.startTime) {
+      activeDomain = session.domain;
+      lastSessionStartTime = session.startTime;
+      activeVideoInfo = session.video || null;
+    }
+  }
+
   // Guardar tiempo acumulado en la sesión anterior si existía
   if (activeDomain && lastSessionStartTime) {
     const elapsedSeconds = Math.round((now - lastSessionStartTime) / 1000);
-    if (elapsedSeconds > 0) {
+    if (elapsedSeconds > 0 && elapsedSeconds <= 300) { // Max 5 minutos de golpe (previene bugs si Chrome se cierra)
       await addTimeToStorage(activeDomain, elapsedSeconds, activeVideoInfo);
+    } else if (elapsedSeconds > 300) {
+      await addTimeToStorage(activeDomain, 60, activeVideoInfo); // Valor conservador
     }
   }
 
@@ -179,27 +191,42 @@ chrome.runtime.onMessage.addListener(async (message, sender) => {
 chrome.alarms.create('timetracker_backup', { periodInMinutes: 1 });
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === 'timetracker_backup') {
+    // Restaurar si el SW se despertó justo por la alarma
+    if (!activeDomain && !lastSessionStartTime) {
+      const session = await getStorageValue('activeSession');
+      if (session && session.domain && session.startTime) {
+        activeDomain = session.domain;
+        lastSessionStartTime = session.startTime;
+        activeVideoInfo = session.video || null;
+      }
+    }
+
     if (activeDomain && lastSessionStartTime) {
       const now = Date.now();
       const elapsedSeconds = Math.round((now - lastSessionStartTime) / 1000);
-      if (elapsedSeconds > 0) {
+      if (elapsedSeconds > 0 && elapsedSeconds <= 300) {
         await addTimeToStorage(activeDomain, elapsedSeconds, activeVideoInfo);
-        
-        // Mantener la sesión activa avanzando el startTime
-        lastSessionStartTime = now;
-        const session = {
-          domain: activeDomain,
-          startTime: lastSessionStartTime,
-          video: activeVideoInfo
-        };
-        await setStorageValue('activeSession', session);
+      } else if (elapsedSeconds > 300) {
+        await addTimeToStorage(activeDomain, 60, activeVideoInfo);
       }
+      
+      // Mantener la sesión activa avanzando el startTime
+      lastSessionStartTime = Date.now();
+      const session = {
+        domain: activeDomain,
+        startTime: lastSessionStartTime,
+        video: activeVideoInfo
+      };
+      await setStorageValue('activeSession', session);
     }
   }
 });
 
 // ── INICIALIZACIÓN AL INICIAR/DESPERTAR SW ──
 async function initActiveTab() {
+  const session = await getStorageValue('activeSession');
+  const storedDomain = session ? session.domain : null;
+  const storedVideo = session ? session.video : null;
 
   const windows = await chrome.windows.getAll({ populate: true }).catch(() => []);
   // Buscamos una ventana normal que esté enfocada, o en su defecto la primera ventana normal
@@ -215,7 +242,9 @@ async function initActiveTab() {
     if (activeTab) {
       activeTabId = activeTab.id;
       const domain = extractDomain(activeTab.url);
-      await updateActiveSession(domain, null);
+      // Mantenemos la info del video si el dominio no ha cambiado
+      const videoInfo = (domain === storedDomain) ? storedVideo : null;
+      await updateActiveSession(domain, videoInfo);
       return;
     }
   }
